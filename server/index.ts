@@ -369,6 +369,99 @@ app.post("/api/admin/action", async (c) => {
   return c.json({ key })
 })
 
+// ---------- Place suggestions ----------
+// A resident can suggest a road, footpath or bridge that isn't in the ledger yet. Suggestions stay
+// on the relayer (never on Arkiv) until a curator checks them and adds the place as an asset.
+
+type Suggestion = { id: string; ward: string; kind: AssetKind; name: string; stretch: string; area: string; day: number }
+const suggestionsFile = `data/suggestions.${store.mode}.json`
+let suggestions: Suggestion[] = existsSync(suggestionsFile) ? JSON.parse(readFileSync(suggestionsFile, "utf8")) : []
+const saveSuggestions = () => writeFileSync(suggestionsFile, JSON.stringify(suggestions))
+const KINDS: AssetKind[] = ["road", "footpath", "bridge"]
+const clean = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max)
+
+app.post("/api/suggest", async (c) => {
+  const b = await c.req.json<Partial<Suggestion>>().catch(() => ({}) as Partial<Suggestion>)
+  const s = {
+    ward: clean(b.ward, 8),
+    kind: b.kind as AssetKind,
+    name: clean(b.name, 80),
+    stretch: clean(b.stretch, 120),
+    area: clean(b.area, 60),
+  }
+  if (!WARDS.some((w) => w.id === s.ward)) return fail(c, 400, "pick a ward")
+  if (!KINDS.includes(s.kind)) return fail(c, 400, "pick road, footpath or bridge")
+  if (s.name.length < 3 || s.stretch.length < 3) return fail(c, 400, "add a name and the stretch")
+  const pii = checkText(`${s.name} ${s.stretch} ${s.area}`)
+  if (pii.blocked.length) return fail(c, 400, `Remove ${pii.blocked.join(", ")}`)
+  if (suggestions.length >= 500) return fail(c, 409, "The curators' queue is full. Please try again later.")
+  const dup = suggestions.find((x) => x.ward === s.ward && x.name.toLowerCase() === s.name.toLowerCase() && x.stretch.toLowerCase() === s.stretch.toLowerCase())
+  if (!dup) {
+    suggestions.push({ id: createHash("sha256").update(`${Date.now()}${Math.random()}`).digest("hex").slice(0, 12), day: today(), ...s })
+    saveSuggestions()
+  }
+  return c.json({ ok: true })
+})
+
+app.get("/api/admin/suggestions", (c) => c.json(suggestions))
+
+app.post("/api/admin/suggestions/dismiss", async (c) => {
+  const { id } = await c.req.json<{ id: string }>()
+  suggestions = suggestions.filter((x) => x.id !== id)
+  saveSuggestions()
+  return c.json({ ok: true })
+})
+
+// Adds a place to the ledger: an asset record plus a first responsibility record (agency only,
+// until a curator finds the tender).
+app.post("/api/admin/asset", async (c) => {
+  const b = await c.req.json<{ ward: string; kind: AssetKind; name: string; stretch: string; area: string; agency: string; wardOffice: string; officer: string; suggestion?: string }>()
+  const w = WARDS.find((x) => x.id === b.ward)
+  if (!w) return fail(c, 400, "unknown ward")
+  if (!KINDS.includes(b.kind)) return fail(c, 400, "bad kind")
+  const name = clean(b.name, 80)
+  const stretch = clean(b.stretch, 120)
+  if (name.length < 3 || stretch.length < 3) return fail(c, 400, "name and stretch are required")
+  const recs = await store.query({ ward: w.id })
+  const prefix = `${w.id}-${{ road: "RD", footpath: "FP", bridge: "BR" }[b.kind]}-`
+  const taken = recs.filter((r) => fromCurator(r) && r.attrs.type === "asset" && String(r.attrs.asset).startsWith(prefix))
+  const id = `${prefix}${String(taken.length + 1).padStart(3, "0")}`
+  const asset: AssetPayload = { name, kind: b.kind, stretch, area: clean(b.area, 60) || w.area.split(",")[0] }
+  const resp: ResponsibilityPayload = {
+    agency: clean(b.agency, 60) || "BMC",
+    wardOffice: clean(b.wardOffice, 80) || `BMC ${w.name} office`,
+    contractor: null,
+    tender: null,
+    cost: null,
+    completed: null,
+    surface: null,
+    dlpEnd: null,
+    dlpYears: null,
+    repairDays: null,
+    repairClause: null,
+    penaltyClause: null,
+    officer: clean(b.officer, 80) || `Assistant Engineer, ${w.name}`,
+    otherAgencies: [],
+    lastAudit: null,
+    sources: [],
+    sample: false,
+  }
+  await store.write("curator", [
+    { attrs: { project: PROJECT, type: "asset", ward: w.id, asset: id, kind: b.kind }, payload: asset, days: LIFETIME_DAYS.asset },
+    {
+      attrs: { project: PROJECT, type: "responsibility", ward: w.id, asset: id, agency: resp.agency, dlp_end: 0 },
+      payload: resp,
+      days: LIFETIME_DAYS.responsibility,
+    },
+  ])
+  if (b.suggestion) {
+    suggestions = suggestions.filter((x) => x.id !== b.suggestion)
+    saveSuggestions()
+  }
+  forget(`ward:${w.id}`)
+  return c.json({ id })
+})
+
 // In production the relayer also serves the static site built by `next build` (out/).
 if (existsSync("out")) app.use("/*", serveStatic({ root: "./out" }))
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { type AssetView, buildGroups, buildWard, type GroupState, type Roster } from "../../shared/model"
 import type { Rec } from "../../shared/records"
+import { WARDS } from "../../shared/config"
 
 export type Config = {
   mode: "local" | "arkiv"
@@ -72,4 +73,30 @@ export function useWard(ward: string) {
 
   const refresh = useCallback(() => setTick((t) => t + 1), [])
   return { data, error, refresh }
+}
+
+/** Every ward at once, for searching the whole city. Still downloads whole wards, never one road. */
+export function useAllWards() {
+  const [views, setViews] = useState<AssetView[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      try {
+        const [config, groups] = await Promise.all([getConfig(), loadGroups()])
+        const wards = await Promise.all(
+          WARDS.map(async (w) => buildWard(await getJson<Rec[]>(`/api/ward/${w.id}`), groups, config.roster)),
+        )
+        if (live) setViews(wards.flat())
+      } catch (e) {
+        if (live) setError((e as Error).message)
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [])
+
+  return { views, error }
 }

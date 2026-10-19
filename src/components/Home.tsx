@@ -18,11 +18,6 @@ function savedWard() {
   }
 }
 
-const toLedger = (e: React.MouseEvent) => {
-  e.preventDefault()
-  document.getElementById("ledger")?.scrollIntoView({ behavior: "smooth" })
-}
-
 export function Home() {
   const [ward, setWard] = useState(savedWard)
   const [q, setQ] = useState("")
@@ -71,7 +66,7 @@ export function Home() {
               give them a deadline the whole city can watch. No name, no number, no login.
             </p>
             <div className="hero-cta">
-              <a className="btn solid" href="#/" onClick={toLedger}>
+              <a className="btn solid" href="#/report">
                 Report a problem <Icon name="arrow" />
               </a>
               <a className="btn" href="#/privacy">

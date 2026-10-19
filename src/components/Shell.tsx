@@ -8,6 +8,7 @@ import { Home } from "./Home"
 import { MePage } from "./Me"
 import { PrivacyPage } from "./Privacy"
 import { ReportPage } from "./Report"
+import { ReportStart } from "./ReportStart"
 import { Icon, useHash } from "./ui"
 
 export function Shell() {
@@ -21,12 +22,13 @@ export function Shell() {
   let page: React.ReactNode
   if (section === "asset" && id) page = <AssetPage key={id} id={id} />
   else if (section === "report" && id) page = <ReportPage key={id} id={id} />
+  else if (section === "report") page = <ReportStart />
   else if (section === "me") page = <MePage />
   else if (section === "privacy") page = <PrivacyPage />
   else if (section === "admin") page = <AdminPage />
   else page = <Home />
 
-  const current = section === "asset" || section === "report" ? "" : section
+  const current = section === "asset" ? "" : section
   const link = (href: string, label: string, match: string, cls = "") => (
     <a href={href} className={cls} aria-current={current === match ? "page" : undefined}>
       {label}
@@ -56,11 +58,7 @@ export function Shell() {
             {link("#/", "Ledger", "", "hide-sm")}
             {link("#/privacy", "Privacy", "privacy", "hide-sm")}
             {link("#/me", "You", "me")}
-            <a className="nav-cta" href="#/" onClick={(e) => {
-              e.preventDefault()
-              location.hash = "#/"
-              setTimeout(() => document.getElementById("ledger")?.scrollIntoView({ behavior: "smooth" }), 60)
-            }}>
+            <a className="nav-cta" href="#/report" aria-current={section === "report" ? "page" : undefined}>
               Report
             </a>
           </nav>
@@ -100,7 +98,7 @@ function Footer({ mode }: { mode?: string }) {
             Jawabdehi holds the people paid to maintain Mumbai's roads, footpaths and bridges to their contracts. It records places
             and public duties — never individuals.
           </p>
-          <a className="btn solid" href="#/">
+          <a className="btn solid" href="#/report">
             Report a problem <Icon name="arrow" />
           </a>
         </div>

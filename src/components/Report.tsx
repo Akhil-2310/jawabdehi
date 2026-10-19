@@ -131,9 +131,11 @@ export function ReportPage({ id }: { id: string }) {
       <div className="asphalt page-band">
         <div className="page page-head">
           <nav className="crumbs eyebrow" style={{ paddingTop: 0 }}>
-            <a href={`#/asset/${v.id}`}>
-              <Icon name="back" size={13} /> {v.asset.name}
+            <a href="#/report">
+              <Icon name="back" size={13} /> Pick another place
             </a>
+            <span>/</span>
+            <a href={`#/asset/${v.id}`}>{v.asset.name}</a>
           </nav>
           <h1 className="display page-title">Report a problem</h1>
           <p className="lede">

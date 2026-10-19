@@ -2,12 +2,12 @@
 
 // Curator console: file notices, record the authority's responses, and record actions taken.
 // Everything here is written from the curator wallet, so readers can check who wrote it.
-import { useState } from "react"
-import { ACTIONS, type ActionType, ESCALATION_LEVELS, RESPONSE_STATUSES, type ResponseStatus, WARDS } from "../../shared/config"
+import { useCallback, useEffect, useState } from "react"
+import { ACTIONS, type ActionType, ASSET_KINDS, type AssetKind, ESCALATION_LEVELS, RESPONSE_STATUSES, type ResponseStatus, WARDS } from "../../shared/config"
 import { grievance } from "../../shared/grievance"
 import { type AssetView, actionsOpen } from "../../shared/model"
 import { dayToISO, formatDay, today } from "../../shared/util"
-import { postJson, useWard } from "@/lib/api"
+import { getJson, postJson, useWard } from "@/lib/api"
 import { Loading, StatusTag } from "./ui"
 
 const TOKEN_KEY = "jd.admin"
@@ -66,6 +66,7 @@ export function AdminPage() {
         <Loading error={error} />
       ) : (
         <div className="page">
+          <Places token={token} onAdded={refresh} />
           {todo.length > 0 && (
             <section className="section">
               <header>
@@ -248,5 +249,161 @@ function Manage({ v, token, onDone }: { v: AssetView; token: string; onDone: () 
         </details>
       )}
     </div>
+  )
+}
+
+// ---------- Places: suggestions from residents, and adding new places ----------
+
+type Suggestion = { id: string; ward: string; kind: AssetKind; name: string; stretch: string; area: string; day: number }
+type Draft = { ward: string; kind: AssetKind; name: string; stretch: string; area: string; agency: string; wardOffice: string; officer: string; suggestion?: string }
+
+const blank = (ward = "S"): Draft => ({ ward, kind: "road", name: "", stretch: "", area: "", agency: "BMC", wardOffice: "", officer: "" })
+
+function Places({ token, onAdded }: { token: string; onAdded: () => void }) {
+  const [list, setList] = useState<Suggestion[] | null>(null)
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const headers = { "x-admin-token": token }
+
+  const load = useCallback(() => {
+    if (!token) return setList(null)
+    getJson<Suggestion[]>("/api/admin/suggestions", { headers: { "x-admin-token": token } }).then(setList, () => setList(null))
+  }, [token])
+  useEffect(load, [load])
+
+  const add = async () => {
+    if (!draft) return
+    setMsg(null)
+    try {
+      const { id } = await postJson<{ id: string }>("/api/admin/asset", draft, headers)
+      setMsg({ ok: true, text: `Added ${draft.name} as ${id}. Residents can report it now.` })
+      setDraft(null)
+      load()
+      onAdded()
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message })
+    }
+  }
+
+  const dismiss = async (id: string) => {
+    await postJson("/api/admin/suggestions/dismiss", { id }, headers).catch(() => {})
+    load()
+  }
+
+  const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setDraft((d) => (d ? { ...d, [k]: e.target.value } : d))
+
+  return (
+    <section className="section">
+      <header>
+        <span className="idx">Places</span>
+        <h2>Suggested by residents</h2>
+        <p>Check each one, then add it to the ledger or dismiss it. Suggestions never go on Arkiv.</p>
+      </header>
+      <div style={{ display: "grid", gap: 16 }}>
+        {!token ? (
+          <p className="muted">Enter the admin token to see suggestions.</p>
+        ) : list === null ? (
+          <p className="muted">Couldn't load suggestions — check the token.</p>
+        ) : list.length === 0 ? (
+          <p className="muted">No suggestions waiting.</p>
+        ) : (
+          <ol className="log">
+            {list.map((x) => (
+              <li key={x.id} style={{ gridTemplateColumns: "120px 16px 1fr" }}>
+                <time>{formatDay(x.day)}</time>
+                <span className="mark ink" />
+                <div style={{ display: "grid", gap: 8 }}>
+                  <span>
+                    <strong>{x.name}</strong> — {x.stretch}
+                    {x.area && `, ${x.area}`} <span className="faint">({ASSET_KINDS[x.kind]}, {WARDS.find((w) => w.id === x.ward)?.name})</span>
+                  </span>
+                  <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="btn sm solid" onClick={() => setDraft({ ...blank(x.ward), kind: x.kind, name: x.name, stretch: x.stretch, area: x.area, suggestion: x.id })}>
+                      Check & add
+                    </button>
+                    <button className="btn sm quiet" onClick={() => dismiss(x.id)}>
+                      Dismiss
+                    </button>
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {msg && <p className={`callout ${msg.ok ? "green" : "signal"}`}>{msg.text}</p>}
+
+        {draft ? (
+          <div className="suggest" style={{ marginTop: 0 }}>
+            <h3 className="display" style={{ fontSize: 26 }}>
+              {draft.suggestion ? "Add the suggested place" : "Add a place"}
+            </h3>
+            <div className="admin-grid">
+              <label className="field">
+                <span className="label">Ward</span>
+                <select className="input" value={draft.ward} onChange={set("ward")}>
+                  {WARDS.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="label">Kind</span>
+                <select className="input" value={draft.kind} onChange={set("kind")}>
+                  {(Object.keys(ASSET_KINDS) as AssetKind[]).map((k) => (
+                    <option key={k} value={k}>
+                      {ASSET_KINDS[k]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="label">Name</span>
+                <input className="input" value={draft.name} onChange={set("name")} />
+              </label>
+              <label className="field">
+                <span className="label">Stretch</span>
+                <input className="input" value={draft.stretch} onChange={set("stretch")} />
+              </label>
+              <label className="field">
+                <span className="label">Area</span>
+                <input className="input" value={draft.area} onChange={set("area")} />
+              </label>
+              <label className="field">
+                <span className="label">Responsible agency</span>
+                <input className="input" value={draft.agency} onChange={set("agency")} />
+              </label>
+              <label className="field">
+                <span className="label">Ward office</span>
+                <input className="input" value={draft.wardOffice} onChange={set("wardOffice")} placeholder="e.g. BMC S ward office, Bhandup" />
+              </label>
+              <label className="field">
+                <span className="label">Officer (designation)</span>
+                <input className="input" value={draft.officer} onChange={set("officer")} placeholder="e.g. Assistant Engineer (Roads)" />
+              </label>
+            </div>
+            <p className="small faint">The contractor and warranty stay “unknown” until you find the tender and add them.</p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className="btn solid" disabled={draft.name.trim().length < 3 || draft.stretch.trim().length < 3} onClick={add}>
+                Add to the ledger
+              </button>
+              <button className="btn quiet" onClick={() => setDraft(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          token && (
+            <div>
+              <button className="btn" onClick={() => setDraft(blank())}>
+                Add a place yourself
+              </button>
+            </div>
+          )
+        )}
+      </div>
+    </section>
   )
 }
