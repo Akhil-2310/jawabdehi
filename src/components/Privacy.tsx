@@ -29,15 +29,18 @@ const LIMITS = [
 export function PrivacyPage() {
   return (
     <>
-      <div className="page page-head">
-        <p className="eyebrow">Privacy</p>
-        <h1 className="display page-title">
-          Report it. <em>Nobody can trace it back to you.</em>
-        </h1>
-        <p className="lede">
-          People who push for answers on civic works have been threatened and worse. Jawabdehi is built so that there is nothing to
-          hand over: no names, no numbers, no routes.
-        </p>
+      <div className="asphalt page-band">
+        <div className="page page-head">
+          <p className="eyebrow">Privacy</p>
+          <h1 className="display page-title">
+            Report it. <em>Nobody can trace it back to you.</em>
+          </h1>
+          <p className="lede">
+            People who push for answers on civic works have been threatened and worse. Jawabdehi is built so that there is nothing to
+            hand over: no names, no numbers, no routes.
+          </p>
+        </div>
+        <div className="hazard-tape" />
       </div>
       <div className="page">
         <section className="section">

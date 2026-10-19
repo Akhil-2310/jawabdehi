@@ -19,6 +19,7 @@ import { formatDay, today } from "../../shared/util"
 import { useWard } from "@/lib/api"
 import { type Stage, submitPost } from "@/lib/identity"
 import { photoUrl } from "@/lib/photo"
+import { ConeIcon } from "./Art"
 import { SignalButton, stageLabel } from "./Signal"
 import { describe, Icon, Loading, shown, Spinner, Tag, WarrantyTag } from "./ui"
 
@@ -60,6 +61,7 @@ export function AssetPage({ id }: { id: string }) {
 
   return (
     <>
+      <div className="asphalt case-band">
       <div className="page">
         <nav className="crumbs eyebrow" aria-label="Breadcrumb">
           <a href="#/">
@@ -77,6 +79,8 @@ export function AssetPage({ id }: { id: string }) {
           {v.asset.stretch} · {v.asset.area}
         </p>
         <Verdict v={v} onDone={refresh} />
+      </div>
+      <div className="hazard-tape" />
       </div>
 
       <div className="page">
@@ -154,19 +158,31 @@ function Track({ notice }: { notice: NoticeView }) {
   const elapsed = Math.max(0, today() - notice.day)
   const sla = notice.data.slaDays
   const total = Math.min(Math.max(sla, elapsed), 45)
+  const todayAt = Math.min(elapsed, total)
   return (
     <div className="track" aria-label={`Day ${elapsed} of a ${sla}-day limit`}>
-      <div className="ticks">
+      <div className="road">
         {Array.from({ length: total }, (_, i) => {
           const day = i + 1
           const cls = day > elapsed ? "" : day > sla ? "late" : "done"
-          return <span key={i} className={`${cls} ${day === elapsed ? "today" : ""}`} />
+          return <i key={i} className={`${cls} ${day === elapsed ? "today" : ""}`} />
         })}
+        {todayAt > 0 && (
+          <span className="cone" style={{ left: `calc(10px + (100% - 20px) * ${(todayAt - 0.5) / total})` }}>
+            <ConeIcon size={26} />
+          </span>
+        )}
       </div>
       <div className="track-legend">
         <span>Notified {formatDay(notice.day)}</span>
-        {sla < total && <span className="due-mid" style={{ position: "absolute", left: `${(sla / total) * 100}%` }}>│ Due {formatDay(notice.deadline)}</span>}
-        <span>{sla >= total ? `Due ${formatDay(notice.deadline)} · ` : ""}Today · day {elapsed}</span>
+        {sla < total && (
+          <span className="due-mid" style={{ position: "absolute", left: `${(sla / total) * 100}%` }}>
+            Due {formatDay(notice.deadline)}
+          </span>
+        )}
+        <span>
+          {sla >= total ? `Due ${formatDay(notice.deadline)} · ` : ""}Today · day {elapsed}
+        </span>
       </div>
     </div>
   )
@@ -177,42 +193,31 @@ function Track({ notice }: { notice: NoticeView }) {
 function Responsible({ v }: { v: AssetView }) {
   const r = v.responsibility?.data
   if (!r) return <p className="muted">Nobody has recorded who is responsible yet.</p>
+  const row = (label: string, value: React.ReactNode) => (
+    <>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </>
+  )
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <dl className="facts">
-        <dt>Agency</dt>
-        <dd>{r.agency}</dd>
-        <dt>Office</dt>
-        <dd>{r.wardOffice}</dd>
-        <dt>Officer</dt>
-        <dd>{r.officer}</dd>
-        <dt>Contractor</dt>
-        <dd>{r.contractor ?? <span className="muted">Unknown — help us find the tender</span>}</dd>
-        {r.tender && (
-          <>
-            <dt>Tender / work order</dt>
-            <dd className="mono">{r.tender}</dd>
-          </>
-        )}
-        {r.cost && (
-          <>
-            <dt>Sanctioned cost</dt>
-            <dd>{r.cost}</dd>
-          </>
-        )}
-        {r.completed && (
-          <>
-            <dt>Completed</dt>
-            <dd>{r.completed}</dd>
-          </>
-        )}
-        {r.otherAgencies.length > 0 && (
-          <>
-            <dt>Others working here</dt>
-            <dd>{r.otherAgencies.join("; ")}</dd>
-          </>
-        )}
-      </dl>
+    <div style={{ display: "grid", gap: 18 }}>
+      <div className="board">
+        <div className="board-head">
+          <span>Details of work</span>
+          <span>{v.id}</span>
+        </div>
+        <div className="board-title">{v.asset.name}</div>
+        <dl>
+          {row("Agency", r.agency)}
+          {row("Office", r.wardOffice)}
+          {row("Officer", r.officer)}
+          {row("Contractor", r.contractor ?? "Unknown — help us find the tender")}
+          {r.tender && row("Tender / work order", <span className="mono">{r.tender}</span>)}
+          {r.cost && row("Sanctioned cost", r.cost)}
+          {r.completed && row("Completed", r.completed)}
+          {r.otherAgencies.length > 0 && row("Others working here", r.otherAgencies.join("; "))}
+        </dl>
+      </div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
         {r.sources.map((s) => (
           <a key={s.url} className="small" href={s.url} target="_blank" rel="noreferrer noopener" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>

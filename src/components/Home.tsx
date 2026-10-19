@@ -4,7 +4,8 @@ import { useMemo, useState } from "react"
 import { ASSET_KINDS, WARDS } from "../../shared/config"
 import type { AssetView } from "../../shared/model"
 import { useWard } from "@/lib/api"
-import { describe, Icon, Loading, StatusTag, WarrantyTag } from "./ui"
+import { BridgeArt, FootpathArt, GarbageArt, HeroScene, PotholeArt, SignNumber } from "./Art"
+import { describe, Icon, Loading, StatusTag, Tag, WarrantyTag } from "./ui"
 
 const WARD_KEY = "jd.ward"
 const urgency: Record<string, number> = { overdue: 0, disputed: 1, responded: 2, clock: 3, claimed: 4, reported: 5, fixed: 6, quiet: 7 }
@@ -15,6 +16,11 @@ function savedWard() {
   } catch {
     return "S"
   }
+}
+
+const toLedger = (e: React.MouseEvent) => {
+  e.preventDefault()
+  document.getElementById("ledger")?.scrollIntoView({ behavior: "smooth" })
 }
 
 export function Home() {
@@ -52,66 +58,94 @@ export function Home() {
 
   return (
     <>
-      <section className="page hero">
-        <div className="hero-copy">
-          <p className="eyebrow">Mumbai · roads, footpaths &amp; bridges</p>
-          <h1 className="display hero-title">
-            Every broken road has a contractor. <em>Now it has a deadline.</em>
-          </h1>
-          <p className="hero-lede">
-            Report a pothole, a broken footpath or a damaged bridge without a name, number or login. See who was paid to build it,
-            whether it's still under warranty, and what happens when they ignore it.
-          </p>
-          <div className="hero-cta">
-            <a
-              className="btn solid"
-              href="#/"
-              onClick={(e) => {
-                // Routes live in the hash, so scroll instead of jumping to an anchor.
-                e.preventDefault()
-                document.getElementById("ledger")?.scrollIntoView({ behavior: "smooth" })
-              }}
-            >
-              Find your road <Icon name="arrow" />
-            </a>
-            <a className="btn quiet" href="#/privacy">
-              <Icon name="shield" /> How you stay anonymous
-            </a>
+      {/* ---------- Hero ---------- */}
+      <section className="hero asphalt">
+        <div className="page hero-grid">
+          <div className="hero-copy">
+            <p className="eyebrow hero-eyebrow">Mumbai · roads · footpaths · bridges</p>
+            <h1 className="display hero-title">
+              Potholes don't fix themselves. <em>Somebody was paid to.</em>
+            </h1>
+            <p className="hero-lede">
+              Snap the pothole, the broken footpath, the cracked bridge. See the contractor, the tender and the warranty — then
+              give them a deadline the whole city can watch. No name, no number, no login.
+            </p>
+            <div className="hero-cta">
+              <a className="btn solid" href="#/" onClick={toLedger}>
+                Report a problem <Icon name="arrow" />
+              </a>
+              <a className="btn" href="#/privacy">
+                <Icon name="shield" /> Why it's anonymous
+              </a>
+            </div>
+          </div>
+          <div className="hero-art">
+            <HeroScene />
+            <SiteBoard v={sorted[0]} />
           </div>
         </div>
-        <NoticeCard v={sorted[0]} />
       </section>
 
-      <section className="page">
+      <Ticker views={sorted} />
+
+      {/* ---------- The numbers ---------- */}
+      <section className="page stats">
+        <Stat n="59,000+" label="potholes reported in Mumbai in 2023" source="BMC data via Newslaundry" />
+        <Stat n="44%" label="of Mumbai's road deaths in 2023 were pedestrians" source="Free Press Journal" />
+        <Stat n="₹6 lakh" label="compensation per pothole death, ordered by the Bombay High Court" source="Moneylife, Oct 2025" />
+        <Stat n="0" label="reporters Jawabdehi can identify — by design" source="No accounts, no numbers, no logs" tone="ok" />
+      </section>
+
+      {/* ---------- What you can report ---------- */}
+      <section className="page block">
+        <div className="block-head">
+          <p className="eyebrow">What you can report</p>
+          <h2 className="display block-title">If it's broken and public, it's on record.</h2>
+        </div>
+        <div className="kinds">
+          <Kind art={<PotholeArt />} title="Potholes & road damage" text="Craters, sunken patches, surfaces that broke up after one monsoon." />
+          <Kind art={<FootpathArt />} title="Broken footpaths" text="Missing paver blocks, open trenches, footpaths you can't walk on." />
+          <Kind art={<BridgeArt />} title="Bridges & foot overbridges" text="Cracks, exposed rusting steel, missing railings." />
+          <Kind art={<GarbageArt />} title="Garbage & dumping spots" text="Uncollected bins and recurring dumping spots — places, never people." soon />
+        </div>
+      </section>
+
+      {/* ---------- How it works ---------- */}
+      <section className="page block">
+        <div className="block-head">
+          <p className="eyebrow">How it works</p>
+          <h2 className="display block-title">Report once. The clock does the rest.</h2>
+        </div>
         <ol className="how">
           <li>
-            <span className="how-n">i.</span>
+            <SignNumber n={1} />
             <strong>Report</strong>
-            <span>A photo and a place. Your report is tied to the road, never to you.</span>
+            <span>A photo and a place. The report is tied to the road, never to you.</span>
           </li>
           <li>
-            <span className="how-n">ii.</span>
+            <SignNumber n={2} />
             <strong>See who</strong>
-            <span>Agency, contractor, tender and warranty, each with a source.</span>
+            <span>Agency, contractor, tender number and warranty — each with its source.</span>
           </li>
           <li>
-            <span className="how-n">iii.</span>
+            <SignNumber n={3} />
             <strong>Start the clock</strong>
             <span>Once the authority is told, the repair deadline is public.</span>
           </li>
           <li>
-            <span className="how-n">iv.</span>
+            <SignNumber n={4} />
             <strong>Act together</strong>
-            <span>Deadline missed? Residents vote to escalate, invoke the warranty, file an RTI or go to the press.</span>
+            <span>Deadline missed? Vote to escalate, invoke the warranty, file an RTI or call the press.</span>
           </li>
         </ol>
       </section>
 
-      <section className="page" id="ledger">
+      {/* ---------- The ledger ---------- */}
+      <section className="page block" id="ledger">
         <div className="ledger-head">
           <div>
             <p className="eyebrow">The ledger</p>
-            <h2 className="display ledger-title">{wardInfo.name}</h2>
+            <h2 className="display block-title">{wardInfo.name}</h2>
             <p className="faint small">{wardInfo.area}</p>
           </div>
           <div className="seg" role="tablist" aria-label="Ward">
@@ -125,23 +159,21 @@ export function Home() {
 
         <div className="figures">
           <Figure n={views.length} label="places on record" />
-          <Figure n={late.length} label="past their deadline" tone="signal" />
-          <Figure n={running.length} label="with the clock running" tone="ochre" />
-          <Figure n={warranty.length} label="still under warranty" tone="green" />
+          <Figure n={late.length} label="past their deadline" tone="late" />
+          <Figure n={running.length} label="clock running" tone="clock" />
+          <Figure n={warranty.length} label="under warranty" tone="ok" />
         </div>
 
         <div className="toolbar">
           <input
             className="input"
             type="search"
-            placeholder="Search a road, area, contractor or ID"
+            placeholder="Find your road, area, contractor or ID"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Search the ledger"
           />
-          <p className="faint tiny">
-            The whole ward is downloaded and checked on your device, so nobody can tell which road you looked up.
-          </p>
+          <p className="faint tiny">The whole ward is downloaded and checked on your device, so nobody can tell which road you looked up.</p>
         </div>
 
         {!data ? (
@@ -161,7 +193,57 @@ export function Home() {
           </div>
         )}
       </section>
+
+      {/* ---------- Privacy band ---------- */}
+      <section className="asphalt band">
+        <div className="hazard-tape" />
+        <div className="page band-grid">
+          <div>
+            <p className="eyebrow">Built for people who get threatened for asking</p>
+            <h2 className="display block-title">Report it. Nobody can trace it back to you.</h2>
+          </div>
+          <ul className="band-points">
+            <li>
+              <strong>No account, ever.</strong> No phone number, OTP or email.
+            </li>
+            <li>
+              <strong>Zero-knowledge proofs.</strong> Each report proves a real person sent it — not which one.
+            </li>
+            <li>
+              <strong>Clean photos.</strong> Location and phone details stripped before upload. Tap to blur faces and plates.
+            </li>
+            <li>
+              <a href="#/privacy">
+                Everything we do, and its limits <Icon name="arrow" />
+              </a>
+            </li>
+          </ul>
+        </div>
+      </section>
     </>
+  )
+}
+
+function Stat({ n, label, source, tone }: { n: string; label: string; source: string; tone?: string }) {
+  return (
+    <div className={`stat ${tone ?? ""}`}>
+      <span className="stat-n">{n}</span>
+      <span className="stat-l">{label}</span>
+      <span className="stat-s">{source}</span>
+    </div>
+  )
+}
+
+function Kind({ art, title, text, soon }: { art: React.ReactNode; title: string; text: string; soon?: boolean }) {
+  return (
+    <article className="kind">
+      <div className="kind-art">
+        {art}
+        {soon && <span className="kind-soon">Coming next</span>}
+      </div>
+      <h3>{title}</h3>
+      <p className="small muted">{text}</p>
+    </article>
   )
 }
 
@@ -174,11 +256,33 @@ function Figure({ n, label, tone }: { n: number; label: string; tone?: string })
   )
 }
 
+function Ticker({ views }: { views: AssetView[] }) {
+  const items = views
+    .filter((v) => v.status.stage !== "quiet")
+    .map((v) => {
+      const d = describe(v.status)
+      return `${v.asset.name} — ${d.figure ? `${d.figure} ${d.unit}` : d.label}`
+    })
+  if (!items.length) return <div className="hazard-tape" />
+  const run = [...items, ...items]
+  return (
+    <div className="ticker" aria-label="Latest from the ledger">
+      <div className="ticker-track">
+        {run.map((t, i) => (
+          <span key={i} className="ticker-item" aria-hidden={i >= items.length}>
+            <span className="ticker-mark">▲</span> {t}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Row({ v }: { v: AssetView }) {
   const d = describe(v.status)
   const r = v.responsibility?.data
   return (
-    <a className="ledger-row" href={`#/asset/${v.id}`} role="listitem">
+    <a className={`ledger-row tone-${d.tone}`} href={`#/asset/${v.id}`} role="listitem">
       <span className="lr-place">
         <span className="lr-name">{v.asset.name}</span>
         <span className="lr-sub">
@@ -193,46 +297,43 @@ function Row({ v }: { v: AssetView }) {
         <WarrantyTag v={v} />
       </span>
       <span className="lr-status">
-        {d.figure && <span className={`lr-fig num tone-${d.tone}`}>{d.figure}</span>}
+        {d.figure && <span className="lr-fig num">{d.figure}</span>}
         <StatusTag status={v.status} />
       </span>
     </a>
   )
 }
 
-function NoticeCard({ v }: { v?: AssetView }) {
-  if (!v) return <div className="notice-card notice-empty" aria-hidden />
+/** The kind of board every Mumbai work site has to put up — filled with what the contract says. */
+function SiteBoard({ v }: { v?: AssetView }) {
+  if (!v) return null
   const d = describe(v.status)
   const r = v.responsibility?.data
   return (
-    <a className={`notice-card tone-${d.tone}`} href={`#/asset/${v.id}`}>
-      <div className="nc-top">
-        <span className="eyebrow">Public notice</span>
-        <span className="eyebrow">{v.id}</span>
+    <a className="site-board" href={`#/asset/${v.id}`}>
+      <div className="sb-head">
+        <span>Work details</span>
+        <span className="mono">{v.id}</span>
       </div>
-      <div className="nc-body">
-        {d.figure ? (
-          <div className="nc-fig">
-            <span className="num">{d.figure}</span>
-            <span className="nc-unit">{d.unit}</span>
-          </div>
-        ) : (
-          <div className="nc-headline">{d.headline}</div>
-        )}
-        <div className="nc-name">{v.asset.name}</div>
-        <div className="nc-sub">{v.asset.stretch}</div>
-      </div>
-      <dl className="nc-facts">
+      <div className="sb-name">{v.asset.name}</div>
+      <dl className="sb-facts">
         <dt>Contractor</dt>
         <dd>{r?.contractor ?? "Unknown"}</dd>
         <dt>Tender</dt>
         <dd className="mono">{r?.tender ?? "—"}</dd>
-        <dt>Residents</dt>
-        <dd>{v.people.total >= 3 ? v.people.total : "Fewer than 3"}</dd>
+        <dt>Warranty</dt>
+        <dd>{v.warranty.state === "active" ? `Until ${new Date(v.warranty.endDay! * 864e5).getUTCFullYear()} — contractor pays` : v.warranty.state === "ended" ? "Ended" : "Unknown"}</dd>
       </dl>
-      <span className="nc-open">
-        Open the case <Icon name="arrow" />
-      </span>
+      <div className={`sb-status tone-${d.tone}`}>
+        {d.figure ? (
+          <>
+            <span className="sb-fig">{d.figure}</span> {d.unit}
+          </>
+        ) : (
+          d.label
+        )}
+        <Tag tone="ochre">Open case</Tag>
+      </div>
     </a>
   )
 }

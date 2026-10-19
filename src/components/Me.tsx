@@ -35,14 +35,17 @@ export function MePage() {
 
   return (
     <>
-      <div className="page page-head">
-        <p className="eyebrow">You</p>
-        <h1 className="display page-title">
-          An identity with <em>no name</em> on it.
-        </h1>
-        <p className="lede">
-          It lives only in this browser. There's no account, phone number or email, and nothing on our side that knows it's you.
-        </p>
+      <div className="asphalt page-band">
+        <div className="page page-head">
+          <p className="eyebrow">You</p>
+          <h1 className="display page-title">
+            An identity with <em>no name</em> on it.
+          </h1>
+          <p className="lede">
+            It lives only in this browser. There's no account, phone number or email, and nothing on our side that knows it's you.
+          </p>
+        </div>
+        <div className="hazard-tape" />
       </div>
 
       <div className="page">

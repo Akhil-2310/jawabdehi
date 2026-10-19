@@ -128,16 +128,19 @@ export function ReportPage({ id }: { id: string }) {
 
   return (
     <>
-      <div className="page page-head">
-        <nav className="crumbs eyebrow" style={{ paddingTop: 0 }}>
-          <a href={`#/asset/${v.id}`}>
-            <Icon name="back" size={13} /> {v.asset.name}
-          </a>
-        </nav>
-        <h1 className="display page-title">Report a problem</h1>
-        <p className="lede">
-          {v.asset.name}, {v.asset.stretch}. No name, number or login — the report is attached to this place, not to you.
-        </p>
+      <div className="asphalt page-band">
+        <div className="page page-head">
+          <nav className="crumbs eyebrow" style={{ paddingTop: 0 }}>
+            <a href={`#/asset/${v.id}`}>
+              <Icon name="back" size={13} /> {v.asset.name}
+            </a>
+          </nav>
+          <h1 className="display page-title">Report a problem</h1>
+          <p className="lede">
+            {v.asset.name}, {v.asset.stretch}. No name, number or login — the report is attached to this place, not to you.
+          </p>
+        </div>
+        <div className="hazard-tape" />
       </div>
 
       <div className="page form-page">
@@ -258,7 +261,7 @@ export function ReportPage({ id }: { id: string }) {
               </ol>
             </div>
           ) : null}
-          <div className="aside-box">
+          <div className="aside-box dark">
             <h3>What stays private</h3>
             <p>Your name, number and location are never asked for. Photo metadata is stripped twice: here, then again by the relayer.</p>
             <p>Reports are published in shuffled daily batches, dated by day only.</p>

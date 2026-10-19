@@ -43,20 +43,23 @@ export function AdminPage() {
 
   return (
     <>
-      <div className="page page-head">
-        <p className="eyebrow">Curators</p>
-        <h1 className="display page-title">Curator console</h1>
-        <p className="lede">Records written here come from the curator wallet. They can't be edited afterwards, only superseded.</p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <input className="input" type="password" placeholder="Admin token (from .env)" value={token} onChange={(e) => save(e.target.value)} style={{ maxWidth: 320 }} aria-label="Admin token" />
-          <div className="seg" role="tablist" aria-label="Ward">
-            {WARDS.map((w) => (
-              <button key={w.id} role="tab" aria-selected={ward === w.id} onClick={() => setWard(w.id)}>
-                {w.name}
-              </button>
-            ))}
+      <div className="asphalt page-band">
+        <div className="page page-head">
+          <p className="eyebrow">Curators</p>
+          <h1 className="display page-title">Curator console</h1>
+          <p className="lede">Records written here come from the curator wallet. They can't be edited afterwards, only superseded.</p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <input className="input" type="password" placeholder="Admin token (from .env)" value={token} onChange={(e) => save(e.target.value)} style={{ maxWidth: 320 }} aria-label="Admin token" />
+            <div className="seg" role="tablist" aria-label="Ward">
+              {WARDS.map((w) => (
+                <button key={w.id} role="tab" aria-selected={ward === w.id} onClick={() => setWard(w.id)}>
+                  {w.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+        <div className="hazard-tape" />
       </div>
 
       {!data ? (
