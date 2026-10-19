@@ -162,7 +162,7 @@ app.get("/api/ward/:ward", async (c) => {
 // Joining: the browser sends only its public commitment. With a valid one-time invite code it
 // joins the verified-resident group; otherwise the open group.
 let joining: Promise<unknown> = Promise.resolve()
-const usedInvitesFile = "data/used-invites.json"
+const usedInvitesFile = `data/used-invites.${store.mode}.json`
 const usedInvites = new Set<string>(existsSync(usedInvitesFile) ? JSON.parse(readFileSync(usedInvitesFile, "utf8")) : [])
 
 app.post("/api/join", async (c) => {
