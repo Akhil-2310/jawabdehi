@@ -10,7 +10,8 @@
     "build": "next build",
     "keys": "tsx scripts/keys.ts",
     "demo": "tsx scripts/demo.ts",
-    "start": "tsx server/index.ts"
+    "start": "tsx server/index.ts",
+    "inspect": "tsx scripts/inspect.ts"
   },
   "dependencies": {
     "@arkiv-network/sdk": "^0.8.1",

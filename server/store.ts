@@ -125,36 +125,47 @@ export class ArkivStore implements Store {
     return result
   }
 
-  async query(filter: Record<string, AttrValue>) {
-    const where = and(
-      eq("project", str(PROJECT)),
-      ...Object.entries(filter).map(([k, v]) => eq(k, typed(k, v))),
-    )
-    // Pin every page to one block so results stay consistent while paging.
-    const block = await this.pub.getBlockNumber()
-    const out: Rec[] = []
-    let page = await this.pub
-      .select({ key: true, creator: true, createdAt: true, expiresAt: true, attributes: true, payload: true })
-      .where(where)
-      .atBlock(block)
-      .limit(200)
-      .fetch()
-    for (;;) {
-      for (const e of page.entities) {
-        out.push({
-          key: e.key,
-          creator: e.creator,
-          createdAt: Number(e.createdAt),
-          expiresAt: Number(e.expiresAt),
-          attrs: Object.fromEntries(
-            Object.entries(e.attributes).map(([k, a]) => [k, typeof a.value === "bigint" ? Number(a.value) : a.value]),
-          ) as Record<string, AttrValue>,
-          payload: e.toJson(),
-        })
-      }
-      if (!page.hasNextPage()) break
-      page = await page.next()
-    }
-    return out
+  query(filter: Record<string, AttrValue>) {
+    return queryArkiv(this.pub, filter)
   }
+}
+
+/**
+ * Reads every live record of this project matching `filter` straight from Arkiv. Needs no key, so
+ * anyone can run it (see scripts/inspect.ts).
+ */
+export async function queryArkiv(
+  pub: ReturnType<typeof createPublicClient> = createPublicClient({ chain: tiramisu, transport: http() }),
+  filter: Record<string, AttrValue> = {},
+): Promise<Rec[]> {
+  const where = and(
+    eq("project", str(PROJECT)),
+    ...Object.entries(filter).map(([k, v]) => eq(k, typed(k, v))),
+  )
+  // Pin every page to one block so results stay consistent while paging.
+  const block = await pub.getBlockNumber()
+  const out: Rec[] = []
+  let page = await pub
+    .select({ key: true, creator: true, createdAt: true, expiresAt: true, attributes: true, payload: true })
+    .where(where)
+    .atBlock(block)
+    .limit(200)
+    .fetch()
+  for (;;) {
+    for (const e of page.entities) {
+      out.push({
+        key: e.key,
+        creator: e.creator,
+        createdAt: Number(e.createdAt),
+        expiresAt: Number(e.expiresAt),
+        attrs: Object.fromEntries(
+          Object.entries(e.attributes).map(([k, a]) => [k, typeof a.value === "bigint" ? Number(a.value) : a.value]),
+        ) as Record<string, AttrValue>,
+        payload: e.toJson(),
+      })
+    }
+    if (!page.hasNextPage()) break
+    page = await page.next()
+  }
+  return out
 }
