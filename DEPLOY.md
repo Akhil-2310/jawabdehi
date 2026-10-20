@@ -19,6 +19,8 @@ The repo has a [`Dockerfile`](Dockerfile), so any host that builds Dockerfiles w
    | `INVITE_CODES` | from `.env` |
    | `BATCH_SECONDS` | `20` for live demos (`86400` = daily, the real privacy setting) |
 
+   | `ARKIV_RPC_URL` | optional but recommended: the Tiramisu RPC URL with your access key from https://hub.arkiv.network/api-keys appended to the path. It raises Arkiv's rate limits. Shared cloud IPs hit the public limit quickly. |
+
    Railway sets `PORT` itself; the server reads it. `DATA_DIR` is already `/data` in the image.
 4. Service → **Settings → Volumes → Add volume**, mount path **`/data`**.
 5. Service → **Settings → Networking → Generate Domain**. That's your live link, e.g. `https://jawabdehi-production.up.railway.app`.

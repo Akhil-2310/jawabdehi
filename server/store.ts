@@ -71,6 +71,15 @@ function normalise(name: string, v: AttrValue | undefined) {
 
 // ---------- Arkiv ----------
 
+/**
+ * The Arkiv RPC transport. ARKIV_RPC_URL can carry an access key (from hub.arkiv.network), which
+ * raises the public rate limits; it's only ever used here on the server, never sent to browsers.
+ * Requests time out instead of hanging forever when the RPC is slow or limiting us.
+ */
+function rpc() {
+  return http(process.env.ARKIV_RPC_URL || undefined, { timeout: 20_000, retryCount: 2 })
+}
+
 function typed(name: string, v: AttrValue) {
   switch (ATTR_TYPES[name]) {
     case "u64":
@@ -92,14 +101,14 @@ const BATCH_LIMIT = 25
 
 export class ArkivStore implements Store {
   readonly mode = "arkiv" as const
-  private pub = createPublicClient({ chain: tiramisu, transport: http() })
+  private pub = createPublicClient({ chain: tiramisu, transport: rpc() })
   private wallets: Record<Signer, ReturnType<typeof createWalletClient>>
   // One write at a time per wallet, so transactions don't collide on the nonce.
   private queues: Record<Signer, Promise<unknown>> = { curator: Promise.resolve(), relayer: Promise.resolve() }
 
   constructor(keys: Record<Signer, Hex>) {
     const wallet = (k: Hex) =>
-      createWalletClient({ chain: tiramisu, transport: http(), account: privateKeyToAccount(k) })
+      createWalletClient({ chain: tiramisu, transport: rpc(), account: privateKeyToAccount(k) })
     this.wallets = { curator: wallet(keys.curator), relayer: wallet(keys.relayer) }
   }
 
@@ -136,7 +145,7 @@ export class ArkivStore implements Store {
  * anyone can run it (see scripts/inspect.ts).
  */
 export async function queryArkiv(
-  pub: ReturnType<typeof createPublicClient> = createPublicClient({ chain: tiramisu, transport: http() }),
+  pub: ReturnType<typeof createPublicClient> = createPublicClient({ chain: tiramisu, transport: rpc() }),
   filter: Record<string, AttrValue> = {},
 ): Promise<Rec[]> {
   const where = and(

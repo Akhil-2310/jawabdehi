@@ -78,19 +78,72 @@ const store: Store =
 mkdirSync(`${DATA}/photos`, { recursive: true })
 
 // ---------- Cached reads ----------
+// Visitors never wait on Arkiv: each ward (and the member list) is served from the last good copy,
+// refreshed in the background at most every REFRESH_MS, and right after our own writes. The copy is
+// saved to disk so a restart starts warm. Arkiv's public RPC is rate-limited, so this also keeps
+// the number of queries low.
 
-const cache = new Map<string, { at: number; recs: Promise<Rec[]> }>()
-function cached(name: string, filter: Record<string, string>) {
-  const hit = cache.get(name)
-  if (hit && Date.now() - hit.at < 10_000) return hit.recs
-  const recs = store.query(filter)
-  cache.set(name, { at: Date.now(), recs })
-  recs.catch(() => cache.delete(name))
-  return recs
+type Entry = { filter: Record<string, string>; at: number; value?: Rec[]; pending?: Promise<Rec[]> }
+const REFRESH_MS = 30_000
+const cache = new Map<string, Entry>()
+const arkivStatus = { lastOkAt: "", lastMs: 0, lastError: "" }
+const snapshotFile = (name: string) => `${DATA}/cache-${name.replace(/[^a-z0-9]/gi, "_")}.json`
+
+function refresh(name: string, e: Entry) {
+  if (e.pending) return e.pending
+  const t = Date.now()
+  e.pending = store
+    .query(e.filter)
+    .then((value) => {
+      e.value = value
+      e.at = Date.now()
+      arkivStatus.lastOkAt = new Date().toISOString()
+      arkivStatus.lastMs = Date.now() - t
+      arkivStatus.lastError = ""
+      try {
+        writeFileSync(snapshotFile(name), JSON.stringify(value))
+      } catch {}
+      return value
+    })
+    .catch((err) => {
+      arkivStatus.lastError = String((err as Error).message ?? err).slice(0, 200)
+      console.error(`Arkiv read for ${name} failed:`, arkivStatus.lastError)
+      throw err
+    })
+    .finally(() => {
+      e.pending = undefined
+    })
+  return e.pending
 }
+
+function cached(name: string, filter: Record<string, string>): Promise<Rec[]> {
+  let e = cache.get(name)
+  if (!e) {
+    e = { filter, at: 0 }
+    try {
+      if (existsSync(snapshotFile(name))) e.value = JSON.parse(readFileSync(snapshotFile(name), "utf8"))
+    } catch {}
+    cache.set(name, e)
+  }
+  if (e.value && Date.now() - e.at < REFRESH_MS) return Promise.resolve(e.value)
+  const p = refresh(name, e)
+  if (e.value) {
+    p.catch(() => {})
+    return Promise.resolve(e.value)
+  }
+  return p
+}
+
+/** After one of our own writes: refresh in the background so the new record shows up soon. */
+function forget(name: string) {
+  const e = cache.get(name)
+  if (!e) return
+  e.at = 0
+  setTimeout(() => refresh(name, e).catch(() => {}), 2_000)
+}
+
 const members = () => cached("members", { type: "member" })
 const ward = (id: string) => cached(`ward:${id}`, { ward: id })
-const forget = (name: string) => cache.delete(name)
 
 // ---------- Seed ----------
 
@@ -185,6 +238,7 @@ app.get("/api/health", (c) =>
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA ?? "local").slice(0, 7),
     started: STARTED,
     verifyThreads: VERIFY_THREADS,
+    arkiv: arkivStatus,
   }),
 )
 
@@ -216,6 +270,7 @@ app.get("/api/ward/:ward", async (c) => {
 // Joining: the browser sends only its public commitment. With a valid one-time invite code it
 // joins the verified-resident group; otherwise the open group.
 let joining: Promise<unknown> = Promise.resolve()
+let nextIdx = 0
 const usedInvitesFile = `${DATA}/used-invites.${store.mode}.json`
 const usedInvites = new Set<string>(existsSync(usedInvitesFile) ? JSON.parse(readFileSync(usedInvitesFile, "utf8")) : [])
 
@@ -232,24 +287,25 @@ app.post("/api/join", async (c) => {
   if (invite && (!INVITES.has(invite) || usedInvites.has(invite))) return fail(c, 400, "That invite code isn't valid or was already used")
 
   const run = async () => {
-    const all = await store.query({ type: "member" })
+    const all = await members()
     const hex = fieldToHex(commitment)
     const mine = all.filter((r) => String(r.attrs.commitment).toLowerCase() === hex)
     const group = invite ? "verified" : "open"
     if (mine.some((r) => r.attrs.group === group) || (!invite && mine.length)) {
       return { group: mine.some((r) => r.attrs.group === "verified") ? "verified" : "open" }
     }
-    await store.write("curator", [
-      {
-        attrs: { project: PROJECT, type: "member", group, idx: all.length, commitment: hex },
-        payload: {},
-        days: LIFETIME_DAYS.member,
-      },
-    ])
+    // idx orders members in the Semaphore tree; never reuse one, even if the cache is behind.
+    const idx = Math.max(nextIdx, ...all.map((r) => Number(r.attrs.idx) + 1))
+    const attrs = { project: PROJECT, type: "member", group, idx, commitment: hex }
+    const [key] = await store.write("curator", [{ attrs, payload: {}, days: LIFETIME_DAYS.member }])
+    nextIdx = idx + 1
     if (invite) {
       usedInvites.add(invite)
       writeFileSync(usedInvitesFile, JSON.stringify([...usedInvites]))
     }
+    // Show the new member straight away; the background refresh replaces this with Arkiv's copy.
+    const e = cache.get("members")
+    if (e?.value) e.value = [...e.value, { key, creator: roster.curator, createdAt: Number.MAX_SAFE_INTEGER, attrs, payload: {} }]
     forget("members")
     return { group }
   }
@@ -315,7 +371,8 @@ app.post("/api/signal", async (c) => {
   if (!(await verify(proof))) return fail(c, 400, "invalid proof")
 
   const nullifier = fieldToHex(proof.nullifier)
-  if (pendingNullifiers.has(nullifier) || (await store.query({ nullifier })).length)
+  // Nullifiers are scoped to places in this ward, so the ward's records hold every earlier use.
+  if (pendingNullifiers.has(nullifier) || recs.some((r) => String(r.attrs.nullifier).toLowerCase() === nullifier))
     return fail(c, 409, content.kind === "post" ? "slot used" : "You've already done this here")
 
   pendingNullifiers.add(nullifier)
@@ -520,6 +577,9 @@ app.post("/api/admin/asset", async (c) => {
 if (existsSync("out")) app.use("/*", serveStatic({ root: "./out" }))
 
 await seedIfEmpty()
+// Warm the cache so the first visitor doesn't wait.
+members().catch(() => {})
+for (const w of WARDS) ward(w.id).catch(() => {})
 serve({ fetch: app.fetch, port: PORT })
 console.log(`Relayer on http://localhost:${PORT} — store: ${store.mode}, batch every ${BATCH_SECONDS}s`)
 console.log(`Curator ${roster.curator} · Relayer ${roster.relayer}`)

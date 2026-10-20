@@ -42,7 +42,7 @@ export function buildGroups(memberRecs: Rec[], roster: Roster): GroupState {
   const seen = new Set<string>()
   const recs = memberRecs
     .filter((r) => same(r.creator, roster.curator) && r.attrs.type === "member")
-    .sort((a, b) => Number(a.attrs.idx) - Number(b.attrs.idx))
+    .sort((a, b) => Number(a.attrs.idx) - Number(b.attrs.idx) || a.createdAt - b.createdAt || (a.key < b.key ? -1 : 1))
   for (const id of Object.keys(members) as GroupId[]) {
     const group = new Group()
     for (const r of recs) {
