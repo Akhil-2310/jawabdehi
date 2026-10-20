@@ -7,6 +7,7 @@ import { today } from "../../shared/util"
 import { useWard } from "@/lib/api"
 import { type Stage, submit } from "@/lib/identity"
 import { loadToCanvas, pixelate, uploadCanvas } from "@/lib/photo"
+import { AfterReport, type Receipt } from "./AfterReport"
 import { wardOf } from "./Asset"
 import { Icon, Loading, Spinner } from "./ui"
 
@@ -33,7 +34,7 @@ export function ReportPage({ id }: { id: string }) {
   const [step, setStep] = useState<Step | null>(null)
   const [passed, setPassed] = useState<Step[]>([])
   const [err, setErr] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState<Receipt | null>(null)
   const holder = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -90,8 +91,8 @@ export function ReportPage({ id }: { id: string }) {
     try {
       advance("uploading")
       const photo = await uploadCanvas(canvas)
-      await submit({ kind: "report", asset: v.id, ward: v.ward, day: today(), problem, severity, note: note.trim(), photo }, advance)
-      setDone(true)
+      const res = await submit({ kind: "report", asset: v.id, ward: v.ward, day: today(), problem, severity, note: note.trim(), photo }, advance)
+      setDone({ nextBatchAt: res.nextBatchAt, nullifier: res.nullifier, problem, severity, note: note.trim() })
       window.scrollTo({ top: 0 })
     } catch (e) {
       setErr((e as Error).message)
@@ -100,31 +101,7 @@ export function ReportPage({ id }: { id: string }) {
     }
   }
 
-  if (done)
-    return (
-      <div className="page page-head" style={{ paddingBottom: 40 }}>
-        <span className="done-mark">
-          <Icon name="check" size={30} />
-        </span>
-        <h1 className="display page-title">Reported.</h1>
-        <p className="lede">
-          Your report is in the relayer's queue. It goes onto the public record in the next batch, shuffled in with everyone
-          else's and dated by day only, so it can't be matched to when you were here.
-        </p>
-        <p className="muted">
-          It carries a proof that a real member sent it, but not which one. Nothing links it to you or to anything else you do
-          here.
-        </p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-          <a className="btn solid" href={`#/asset/${v.id}`}>
-            Back to {v.asset.name} <Icon name="arrow" />
-          </a>
-          <a className="btn" href="#/">
-            The ledger
-          </a>
-        </div>
-      </div>
-    )
+  if (done) return <AfterReport v={v} receipt={done} />
 
   return (
     <>

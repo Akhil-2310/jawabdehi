@@ -1,14 +1,29 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ASSET_KINDS, WARDS } from "../../shared/config"
+import { ASSET_KINDS, PROBLEMS, WARDS } from "../../shared/config"
+import { formatDay } from "../../shared/util"
 import type { AssetView } from "../../shared/model"
 import { matches } from "../../shared/search"
 import { useWard } from "@/lib/api"
 import { BridgeArt, FootpathArt, GarbageArt, HeroScene, PotholeArt, SignNumber } from "./Art"
-import { describe, Icon, Loading, StatusTag, Tag, WarrantyTag } from "./ui"
+import { Journey } from "./Journey"
+import { describe, Icon, Loading, shown, Tag, WarrantyTag } from "./ui"
 
 const WARD_KEY = "jd.ward"
+
+const isLate = (v: AssetView) =>
+  v.status.stage === "overdue" || v.status.stage === "disputed" || (v.status.stage === "responded" && v.status.daysOver > 0)
+
+const FILTERS = [
+  { id: "all", label: "Everything", tone: "none", test: () => true },
+  { id: "late", label: "Past deadline", tone: "late", test: isLate },
+  { id: "clock", label: "Clock running", tone: "clock", test: (v: AssetView) => v.status.stage === "clock" || (v.status.stage === "responded" && v.status.daysOver <= 0) },
+  { id: "reported", label: "Reported", tone: "info", test: (v: AssetView) => v.status.stage === "reported" },
+  { id: "warranty", label: "Under warranty", tone: "ok", test: (v: AssetView) => v.warranty.state === "active" },
+] as const
+
+type FilterId = (typeof FILTERS)[number]["id"]
 const urgency: Record<string, number> = { overdue: 0, disputed: 1, responded: 2, clock: 3, claimed: 4, reported: 5, fixed: 6, quiet: 7 }
 
 function savedWard() {
@@ -36,11 +51,20 @@ export function Home() {
     () => [...views].sort((a, b) => urgency[a.status.stage] - urgency[b.status.stage] || a.asset.name.localeCompare(b.asset.name)),
     [views],
   )
-  const list = useMemo(() => sorted.filter((v) => matches(v, q)), [sorted, q])
-
-  const late = views.filter((v) => ["overdue", "disputed"].includes(v.status.stage) || (v.status.stage === "responded" && v.status.daysOver > 0))
-  const running = views.filter((v) => v.status.stage === "clock")
-  const warranty = views.filter((v) => v.warranty.state === "active")
+  const [filter, setFilter] = useState<FilterId>("all")
+  const list = useMemo(
+    () => sorted.filter((v) => matches(v, q) && FILTERS.find((f) => f.id === filter)!.test(v)),
+    [sorted, q, filter],
+  )
+  const latest = useMemo(
+    () =>
+      views
+        .flatMap((v) => v.reports)
+        .sort((a, b) => b.content.day - a.content.day || b.rec.createdAt - a.rec.createdAt)
+        .slice(0, 5),
+    [views],
+  )
+  const nameOf = (id: string) => views.find((v) => v.id === id)?.asset.name ?? id
   const wardInfo = WARDS.find((w) => w.id === ward)!
 
   return (
@@ -131,8 +155,8 @@ export function Home() {
       <section className="page block" id="ledger">
         <div className="ledger-head">
           <div>
-            <p className="eyebrow">The ledger</p>
-            <h2 className="display block-title">{wardInfo.name}</h2>
+            <p className="eyebrow">Live from the public record</p>
+            <h2 className="display block-title">What's broken in {wardInfo.name}</h2>
             <p className="faint small">{wardInfo.area}</p>
           </div>
           <div className="seg" role="tablist" aria-label="Ward">
@@ -144,45 +168,78 @@ export function Home() {
           </div>
         </div>
 
-        <div className="figures">
-          <Figure n={views.length} label="places on record" />
-          <Figure n={late.length} label="past their deadline" tone="late" />
-          <Figure n={running.length} label="clock running" tone="clock" />
-          <Figure n={warranty.length} label="under warranty" tone="ok" />
-        </div>
-
-        <div className="toolbar">
+        <div className="ledger-tools">
+          <div className="chips" role="group" aria-label="Filter by status">
+            {FILTERS.map((f) => (
+              <button key={f.id} className={`chip chip-${f.tone}`} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+                {f.label} <span className="chip-n num">{views.filter(f.test).length}</span>
+              </button>
+            ))}
+          </div>
           <input
             className="input"
             type="search"
-            placeholder="Find your road, area, contractor or ID"
+            placeholder="Find your road, area or contractor"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Search the ledger"
           />
-          <p className="faint tiny">The whole ward is downloaded and checked on your device, so nobody can tell which road you looked up.</p>
         </div>
 
         {!data ? (
           <Loading error={error} />
-        ) : (
-          <div className="ledger" role="list">
-            <div className="ledger-row ledger-cols" aria-hidden>
-              <span>Place</span>
-              <span>Responsible</span>
-              <span>Warranty</span>
-              <span>Status</span>
-            </div>
+        ) : list.length ? (
+          <div className="cases">
             {list.map((v) => (
-              <Row key={v.id} v={v} />
+              <CaseCard key={v.id} v={v} />
             ))}
-            {!list.length && (
-              <p className="muted" style={{ padding: "24px 0" }}>
-                Nothing in {wardInfo.name} matches “{q}”. <a href="#/report">Search every ward, or suggest the place</a>.
-              </p>
+          </div>
+        ) : (
+          <p className="muted" style={{ padding: "24px 0" }}>
+            Nothing in {wardInfo.name} matches{q ? ` “${q}”` : " this filter"}. <a href="#/report">Search every ward, or suggest the place</a>.
+          </p>
+        )}
+        <p className="faint tiny" style={{ marginTop: 14 }}>
+          Your device downloaded the whole ward and checked every record itself — nobody can tell which road you looked at.
+        </p>
+      </section>
+
+      {/* ---------- Where reports go ---------- */}
+      <section className="page block">
+        <div className="block-head">
+          <p className="eyebrow">Where your report goes</p>
+          <h2 className="display block-title">Sent once. On the record for good.</h2>
+        </div>
+        <div className="flow">
+          <div className="feed">
+            <h3 className="feed-title">Latest reports in {wardInfo.name}</h3>
+            {latest.length ? (
+              latest.map((r) => (
+                <a key={r.rec.key} className="feed-item" href={`#/asset/${r.content.asset}`}>
+                  <span className="feed-top">
+                    <Tag tone={r.content.severity >= 4 ? "signal" : "none"}>{PROBLEMS[r.content.problem].label}</Tag>
+                    <span className="sev" aria-label={`Severity ${r.content.severity} of 5`}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <i key={n} className={n <= r.content.severity ? "on" : ""} />
+                      ))}
+                    </span>
+                  </span>
+                  <strong>{nameOf(r.content.asset)}</strong>
+                  {r.content.note && <span className="feed-note">“{r.content.note}”</span>}
+                  <span className="feed-meta">
+                    {r.group === "verified" ? "Verified resident" : "Citizen"} · {formatDay(r.content.day)} · proof checked
+                  </span>
+                </a>
+              ))
+            ) : (
+              <p className="muted small">No reports in this ward yet. <a href="#/report">Be the first.</a></p>
             )}
           </div>
-        )}
+          <div className="flow-steps asphalt">
+            <h3 className="feed-title">What happens next</h3>
+            <Journey />
+          </div>
+        </div>
       </section>
 
       {/* ---------- Privacy band ---------- */}
@@ -238,15 +295,6 @@ function Kind({ art, title, text, soon }: { art: React.ReactNode; title: string;
   )
 }
 
-function Figure({ n, label, tone }: { n: number; label: string; tone?: string }) {
-  return (
-    <div className={`figure ${tone ?? ""}`}>
-      <span className="figure-n num">{n}</span>
-      <span className="figure-l">{label}</span>
-    </div>
-  )
-}
-
 function Ticker({ views }: { views: AssetView[] }) {
   const items = views
     .filter((v) => v.status.stage !== "quiet")
@@ -269,28 +317,53 @@ function Ticker({ views }: { views: AssetView[] }) {
   )
 }
 
-function Row({ v }: { v: AssetView }) {
+const STAGE_WORD: Record<string, string> = {
+  quiet: "No reports",
+  reported: "Reported",
+  clock: "Clock running",
+  overdue: "Past deadline",
+  claimed: "Repair claimed",
+  fixed: "Fixed",
+  disputed: "Not really fixed",
+}
+
+function CaseCard({ v }: { v: AssetView }) {
   const d = describe(v.status)
   const r = v.responsibility?.data
+  const last = [...v.reports.map((x) => x.content.day), ...v.notices.map((n) => n.day)].sort((a, b) => b - a)[0]
   return (
-    <a className={`ledger-row tone-${d.tone}`} href={`#/asset/${v.id}`} role="listitem">
-      <span className="lr-place">
-        <span className="lr-name">{v.asset.name}</span>
-        <span className="lr-sub">
-          {ASSET_KINDS[v.asset.kind]} · {v.asset.stretch}
+    <a className={`case tone-${d.tone}`} href={`#/asset/${v.id}`}>
+      <div className="case-band">
+        <span className="case-label">{STAGE_WORD[v.status.stage] ?? d.label}</span>
+        {d.figure && (
+          <span className="case-fig">
+            <span className="num">{d.figure}</span> {d.unit.includes("left") ? "days left" : "days late"}
+          </span>
+        )}
+      </div>
+      <div className="case-body">
+        <span className="case-kind">{ASSET_KINDS[v.asset.kind]}</span>
+        <span className="case-name">{v.asset.name}</span>
+        <span className="case-where">
+          {v.asset.stretch} · {v.asset.area}
         </span>
-      </span>
-      <span className="lr-resp">
-        <span>{r?.contractor ?? <span className="faint">Contractor unknown</span>}</span>
-        <span className="lr-sub">{r?.agency}</span>
-      </span>
-      <span className="lr-warranty">
-        <WarrantyTag v={v} />
-      </span>
-      <span className="lr-status">
-        {d.figure && <span className="lr-fig num">{d.figure}</span>}
-        <StatusTag status={v.status} />
-      </span>
+        <dl className="case-facts">
+          <dt>Contractor</dt>
+          <dd>{r?.contractor ?? "Unknown"}</dd>
+          <dt>Warranty</dt>
+          <dd>
+            <WarrantyTag v={v} />
+          </dd>
+          <dt>Residents</dt>
+          <dd>{v.people.total ? shown(v.people.total) : "None yet"}</dd>
+        </dl>
+      </div>
+      <div className="case-foot">
+        <span className="faint tiny">{last ? `Last activity ${formatDay(last)}` : "No activity this month"}</span>
+        <span className="case-open">
+          Open case <Icon name="arrow" size={14} />
+        </span>
+      </div>
     </a>
   )
 }

@@ -3,7 +3,7 @@
 import { Group, Identity, generateProof } from "@semaphore-protocol/core"
 import { type GroupId, POST_SLOTS, TREE_DEPTH } from "../../shared/config"
 import { type SignalContent, scopeOf } from "../../shared/records"
-import { canonical, hashToField } from "../../shared/util"
+import { canonical, fieldToHex, hashToField } from "../../shared/util"
 import { ApiError, loadGroups, postJson } from "./api"
 
 const ID_KEY = "jd.identity"
@@ -58,7 +58,14 @@ export async function submit(content: SignalContent, onStage: (s: Stage) => void
   if (!group || !groups.members[group].includes(identity.commitment)) {
     onStage("joining")
     group = await join()
-    groups = await loadGroups()
+    // A new member takes a few seconds to show up on Arkiv; a proof made before then would be
+    // for a group that doesn't include us yet.
+    for (let tries = 0; ; tries++) {
+      groups = await loadGroups()
+      if (groups.members[group].includes(identity.commitment)) break
+      if (tries >= 20) throw new Error("Joining is taking longer than usual. Please try again in a minute.")
+      await new Promise((r) => setTimeout(r, 1500))
+    }
   }
   onStage("proving")
   const proof = await generateProof(
@@ -72,7 +79,8 @@ export async function submit(content: SignalContent, onStage: (s: Stage) => void
   onStage("sending")
   const res = await postJson<{ queued: boolean; nextBatchAt: number }>("/api/signal", { content, proof })
   addReceipt({ kind: content.kind, asset: content.asset, day: content.day })
-  return res
+  // The nullifier lets this browser spot its own record once it lands, without revealing anything.
+  return { ...res, nullifier: fieldToHex(proof.nullifier) }
 }
 
 /** Posts use up to three slots per asset per day; try the next slot when one is used. */
