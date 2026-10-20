@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -n relayer,web -c blue,green \"npm:dev:relayer\" \"npm:dev:web\"",
     "dev:web": "next dev -p 5173",
-    "dev:relayer": "tsx watch server/index.ts",
+    "dev:relayer": "RELAYER_PORT=8790 tsx watch server/index.ts",
     "build": "next build",
     "keys": "tsx scripts/keys.ts",
     "demo": "tsx scripts/demo.ts",
@@ -21,6 +21,7 @@
     "next": "^16.4.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
     "viem": "^2.57.7"
   },
   "devDependencies": {
@@ -28,7 +29,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "concurrently": "^10.0.6",
-    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }
 }

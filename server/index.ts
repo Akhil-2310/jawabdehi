@@ -52,14 +52,17 @@ const roster: Roster = { curator: privateKeyToAddress(keys.curator), relayer: pr
 const ADMIN_TOKEN = env("ADMIN_TOKEN")
 const BATCH_SECONDS = Number(process.env.BATCH_SECONDS ?? 20)
 const INVITES = new Set((process.env.INVITE_CODES ?? "").split(",").map((s) => s.trim()).filter(Boolean))
-const PORT = Number(process.env.RELAYER_PORT ?? 8790)
+// Hosts like Railway and Render set PORT; local dev sets RELAYER_PORT so it never collides with Next.
+const PORT = Number(process.env.RELAYER_PORT ?? process.env.PORT ?? 8790)
+// Where photos, suggestions and used invite codes live. On a host, point this at a persistent volume.
+const DATA = (process.env.DATA_DIR ?? "data").replace(/\/$/, "")
 
 const fromCurator = (r: Rec) => r.creator.toLowerCase() === roster.curator.toLowerCase()
 
 const store: Store =
-  process.env.STORE_MODE === "arkiv" ? new ArkivStore(keys) : new LocalStore("data/local-chain.json", roster)
+  process.env.STORE_MODE === "arkiv" ? new ArkivStore(keys) : new LocalStore(`${DATA}/local-chain.json`, roster)
 
-mkdirSync("data/photos", { recursive: true })
+mkdirSync(`${DATA}/photos`, { recursive: true })
 
 // ---------- Cached reads ----------
 
@@ -138,6 +141,29 @@ setInterval(flush, BATCH_SECONDS * 1000)
 
 const app = new Hono()
 
+// Abuse limits for the public endpoints: the relayer pays gas for every write. Counts are kept in
+// memory for one minute and never written anywhere; the address is used only as a counter key.
+const LIMITS: Record<string, number> = { "/api/photo": 10, "/api/signal": 30, "/api/join": 5, "/api/suggest": 5 }
+const hits = new Map<string, { n: number; until: number }>()
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, v] of hits) if (v.until < now) hits.delete(k)
+}, 60_000)
+app.use("/api/*", async (c, next) => {
+  const max = c.req.method === "POST" ? LIMITS[c.req.path] : undefined
+  if (max) {
+    const who = (c.req.header("x-forwarded-for") ?? "").split(",")[0].trim() || "local"
+    const key = `${c.req.path}|${who}`
+    const now = Date.now()
+    const h = hits.get(key)
+    if (!h || h.until < now) hits.set(key, { n: 1, until: now + 60_000 })
+    else if (++h.n > max) return c.json({ error: "Too many requests — please wait a minute and try again." }, 429)
+  }
+  await next()
+})
+
+app.get("/api/health", (c) => c.json({ ok: true, mode: store.mode, queued: queue.length }))
+
 const fail = (c: Context, status: 400 | 401 | 404 | 409, error: string) => c.json({ error }, status)
 
 app.get("/api/config", (c) =>
@@ -162,7 +188,7 @@ app.get("/api/ward/:ward", async (c) => {
 // Joining: the browser sends only its public commitment. With a valid one-time invite code it
 // joins the verified-resident group; otherwise the open group.
 let joining: Promise<unknown> = Promise.resolve()
-const usedInvitesFile = `data/used-invites.${store.mode}.json`
+const usedInvitesFile = `${DATA}/used-invites.${store.mode}.json`
 const usedInvites = new Set<string>(existsSync(usedInvitesFile) ? JSON.parse(readFileSync(usedInvitesFile, "utf8")) : [])
 
 app.post("/api/join", async (c) => {
@@ -210,14 +236,14 @@ app.post("/api/photo", async (c) => {
   const clean = stripJpegMetadata(raw)
   if (!clean) return fail(c, 400, "only JPEG photos are accepted")
   const hash = createHash("sha256").update(clean).digest("hex")
-  writeFileSync(`data/photos/${hash}.jpg`, clean)
+  writeFileSync(`${DATA}/photos/${hash}.jpg`, clean)
   return c.json({ hash: `0x${hash}` })
 })
 
 app.get("/photos/:name", (c) => {
   const name = c.req.param("name")
-  if (!/^[0-9a-f]{64}\.jpg$/.test(name) || !existsSync(`data/photos/${name}`)) return fail(c, 404, "not found")
-  return c.body(readFileSync(`data/photos/${name}`), 200, {
+  if (!/^[0-9a-f]{64}\.jpg$/.test(name) || !existsSync(`${DATA}/photos/${name}`)) return fail(c, 404, "not found")
+  return c.body(readFileSync(`${DATA}/photos/${name}`), 200, {
     "content-type": "image/jpeg",
     "cache-control": "public, max-age=31536000, immutable",
   })
@@ -243,7 +269,7 @@ app.post("/api/signal", async (c) => {
     const assetRec = curated.find((r) => r.attrs.type === "asset" && r.attrs.asset === content.asset)!
     const kinds: readonly AssetKind[] = PROBLEMS[content.problem].kinds
     if (!kinds.includes((assetRec.payload as AssetPayload).kind)) return fail(c, 400, "that problem doesn't apply here")
-    if (!existsSync(`data/photos/${content.photo.slice(2)}.jpg`)) return fail(c, 400, "upload the photo first")
+    if (!existsSync(`${DATA}/photos/${content.photo.slice(2)}.jpg`)) return fail(c, 400, "upload the photo first")
   }
   if (content.kind === "vote" && !curated.some((r) => r.key === content.notice && r.attrs.type === "notice" && r.attrs.asset === content.asset))
     return fail(c, 404, "unknown notice")
@@ -374,7 +400,7 @@ app.post("/api/admin/action", async (c) => {
 // on the relayer (never on Arkiv) until a curator checks them and adds the place as an asset.
 
 type Suggestion = { id: string; ward: string; kind: AssetKind; name: string; stretch: string; area: string; day: number }
-const suggestionsFile = `data/suggestions.${store.mode}.json`
+const suggestionsFile = `${DATA}/suggestions.${store.mode}.json`
 let suggestions: Suggestion[] = existsSync(suggestionsFile) ? JSON.parse(readFileSync(suggestionsFile, "utf8")) : []
 const saveSuggestions = () => writeFileSync(suggestionsFile, JSON.stringify(suggestions))
 const KINDS: AssetKind[] = ["road", "footpath", "bridge"]

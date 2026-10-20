@@ -3,6 +3,7 @@
 // app runs before the wallets are funded.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { randomBytes } from "node:crypto"
+import { dirname } from "node:path"
 import { createPublicClient, createWalletClient } from "@arkiv-network/sdk"
 import { bool, bytes32, i32, key as keyAttr, str, u64 } from "@arkiv-network/sdk/attr"
 import { tiramisu } from "@arkiv-network/sdk/chains"
@@ -48,7 +49,7 @@ export class LocalStore implements Store {
       payload: JSON.parse(JSON.stringify(r.payload)),
     }))
     this.recs.push(...created)
-    mkdirSync("data", { recursive: true })
+    mkdirSync(dirname(this.file), { recursive: true })
     writeFileSync(this.file, JSON.stringify({ records: this.recs }))
     return created.map((r) => r.key)
   }

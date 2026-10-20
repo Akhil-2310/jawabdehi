@@ -343,7 +343,17 @@ function Reports({ v }: { v: AssetView }) {
         <div className="photos">
           {v.reports.map((r) => (
             <a key={r.rec.key} href={photoUrl(r.content.photo)} target="_blank" rel="noreferrer">
-              <img src={photoUrl(r.content.photo)} alt={`Reported ${PROBLEMS[r.content.problem].label.toLowerCase()}`} loading="lazy" />
+              <img
+                src={photoUrl(r.content.photo)}
+                alt={`Reported ${PROBLEMS[r.content.problem].label.toLowerCase()}`}
+                loading="lazy"
+                onError={(e) => {
+                  // The record (and the photo's hash) is on Arkiv, but this server doesn't hold the file.
+                  const img = e.currentTarget
+                  img.onerror = null
+                  img.src = "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='400' height='300' fill='#dfdcd3'/><text x='200' y='155' text-anchor='middle' font-family='sans-serif' font-size='18' fill='#7a7d83'>Photo not stored on this server</text></svg>")
+                }}
+              />
             </a>
           ))}
         </div>

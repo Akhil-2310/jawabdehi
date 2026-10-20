@@ -15,7 +15,7 @@ npm run demo     # in another terminal: 7 anonymous residents play the full loop
 
 To see the live testnet data without any keys, run `npm run inspect`: it reads every Jawabdehi record straight from Arkiv and re-verifies every Semaphore proof. The Arkiv schema is in [`arkiv/schema.md`](arkiv/schema.md) and our friction report in [`arkiv/friction.md`](arkiv/friction.md).
 
-For production, `npm run build` writes a static site to `out/` and `npm start` runs the relayer, which serves it on :8790.
+For production, `npm run build` writes a static site to `out/` and `npm start` runs the relayer, which serves it on :8790. To put it online, see [DEPLOY.md](DEPLOY.md).
 
 Open http://localhost:5173. The curator console is at `#/admin` (token in `.env`). The demo uses the first two invite codes in `.env`.
 
