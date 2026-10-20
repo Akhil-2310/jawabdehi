@@ -18,7 +18,6 @@ The repo has a [`Dockerfile`](Dockerfile), so any host that builds Dockerfiles w
    | `ADMIN_TOKEN` | from `.env` |
    | `INVITE_CODES` | from `.env` |
    | `BATCH_SECONDS` | `20` for live demos (`86400` = daily, the real privacy setting) |
-
    | `ARKIV_RPC_URL` | optional but recommended: the Tiramisu RPC URL with your access key from https://hub.arkiv.network/api-keys appended to the path. It raises Arkiv's rate limits. Shared cloud IPs hit the public limit quickly. |
 
    Railway sets `PORT` itself; the server reads it. `DATA_DIR` is already `/data` in the image.
