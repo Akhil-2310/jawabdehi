@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { ASSET_KINDS, WARDS } from "../../shared/config"
 import type { AssetView } from "../../shared/model"
+import { matches } from "../../shared/search"
 import { useWard } from "@/lib/api"
 import { BridgeArt, FootpathArt, GarbageArt, HeroScene, PotholeArt, SignNumber } from "./Art"
 import { describe, Icon, Loading, StatusTag, Tag, WarrantyTag } from "./ui"
@@ -35,16 +36,7 @@ export function Home() {
     () => [...views].sort((a, b) => urgency[a.status.stage] - urgency[b.status.stage] || a.asset.name.localeCompare(b.asset.name)),
     [views],
   )
-  const list = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    if (!needle) return sorted
-    return sorted.filter((v) =>
-      [v.asset.name, v.asset.stretch, v.asset.area, v.responsibility?.data.contractor, v.responsibility?.data.agency, v.id]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-    )
-  }, [sorted, q])
+  const list = useMemo(() => sorted.filter((v) => matches(v, q)), [sorted, q])
 
   const late = views.filter((v) => ["overdue", "disputed"].includes(v.status.stage) || (v.status.stage === "responded" && v.status.daysOver > 0))
   const running = views.filter((v) => v.status.stage === "clock")
@@ -184,7 +176,11 @@ export function Home() {
             {list.map((v) => (
               <Row key={v.id} v={v} />
             ))}
-            {!list.length && <p className="muted" style={{ padding: "24px 0" }}>Nothing matches “{q}”.</p>}
+            {!list.length && (
+              <p className="muted" style={{ padding: "24px 0" }}>
+                Nothing in {wardInfo.name} matches “{q}”. <a href="#/report">Search every ward, or suggest the place</a>.
+              </p>
+            )}
           </div>
         )}
       </section>

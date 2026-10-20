@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { ASSET_KINDS, type AssetKind, WARDS } from "../../shared/config"
 import type { AssetView } from "../../shared/model"
+import { matches } from "../../shared/search"
 import { checkText } from "../../shared/pii"
 import { postJson, useAllWards } from "@/lib/api"
 import { SignNumber } from "./Art"
@@ -18,15 +19,10 @@ export function ReportStart() {
   const [ward, setWard] = useState<string>("all")
 
   const results = useMemo(() => {
-    const needle = q.trim().toLowerCase()
     return (views ?? [])
       .filter((v) => kind === "all" || v.asset.kind === kind)
       .filter((v) => ward === "all" || v.ward === ward)
-      .filter(
-        (v) =>
-          !needle ||
-          [v.asset.name, v.asset.stretch, v.asset.area, v.id, v.responsibility?.data.contractor].join(" ").toLowerCase().includes(needle),
-      )
+      .filter((v) => matches(v, q))
       .sort((a, b) => a.asset.name.localeCompare(b.asset.name))
   }, [views, q, kind, ward])
 
