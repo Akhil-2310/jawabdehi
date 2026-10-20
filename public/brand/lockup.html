@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- Source for the logo PNGs. Render with headless Chrome (see README "Logo"). ?theme=dark for light text. -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@800&family=Mukta:wght@800&display=swap">
+<style>
+  html, body { margin: 0; background: #F3F1EA; }
+  html.dark, html.dark body { background: #1B1C1E; }
+  .lockup { display: inline-flex; align-items: center; gap: 34px; padding: 40px 56px 40px 40px; }
+  .mark { width: 220px; height: 220px; }
+  .words { display: flex; flex-direction: column; gap: 18px; }
+  .en { font: 800 168px/0.82 "Barlow Condensed", "Arial Narrow", sans-serif; letter-spacing: 1px; text-transform: uppercase; color: #121212; }
+  .hi { font: 800 64px/1 "Mukta", sans-serif; color: #D6440F; padding-left: 6px; }
+  .dark .en { color: #F3F1EA; }
+  .dark .hi { color: #FFC41F; }
+</style>
+</head>
+<body>
+<div class="lockup" id="lockup">
+  <img class="mark" src="jawabdehi-mark.svg" alt="">
+  <div class="words"><span class="en">Jawabdehi</span><span class="hi" lang="hi">जवाबदेही</span></div>
+</div>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark")
+</script>
+</body>
+</html>

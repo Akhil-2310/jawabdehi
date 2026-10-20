@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Jawabdehi">
+  <!-- A road warning sign with a pothole full of rainwater: the thing everyone in Mumbai steps around. -->
+  <rect x="30" y="30" width="140" height="140" rx="18" transform="rotate(45 100 100)" fill="#FFC41F" stroke="#121212" stroke-width="9"/>
+  <rect x="43" y="43" width="114" height="114" rx="11" transform="rotate(45 100 100)" fill="none" stroke="#121212" stroke-width="4"/>
+  <!-- one long crack running off toward the sign's edge, with a short fork -->
+  <path d="M132 96 L141 88 L139 79 L150 70 L149 62" stroke="#121212" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M139 79 L130 74" stroke="#121212" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+  <!-- broken asphalt edge: jagged, uneven -->
+  <path d="M58 112 L56 101 L64 96 L62 89 L74 86 L80 79 L92 82 L101 77 L111 81 L122 79 L129 86 L139 88 L137 97 L145 104 L139 112 L143 121 L131 124 L126 132 L114 129 L104 135 L93 130 L82 133 L77 126 L65 124 L66 117 Z" fill="#3B3D41"/>
+  <!-- the hole -->
+  <path d="M66 110 L65 102 L73 98 L74 92 L86 90 L94 86 L104 89 L115 87 L124 92 L131 96 L130 104 L135 110 L128 117 L118 119 L109 124 L97 121 L86 123 L77 118 L68 117 Z" fill="#121314"/>
+  <!-- rainwater with a glint -->
+  <path d="M77 109 C79 101 90 98 102 98 C115 97 125 101 124 108 C123 114 114 116 102 116 C90 117 76 115 77 109 Z" fill="#4F6576"/>
+  <path d="M88 105 C95 102 107 102 115 104" stroke="#A9BDCB" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+  <!-- loose chips -->
+  <path d="M84 141 l6 -2 l2 5 l-6 2 z" fill="#121212"/>
+  <path d="M52 92 l5 -1 l1 5 l-5 1 z" fill="#121212"/>
+</svg>

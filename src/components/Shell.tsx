@@ -75,14 +75,7 @@ export function Shell() {
 }
 
 function Logo() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden>
-      <rect x="5" y="5" width="22" height="22" rx="2.5" transform="rotate(45 16 16)" fill="var(--hazard)" stroke="#000" strokeWidth="2" />
-      <ellipse cx="16" cy="17.5" rx="6.5" ry="3.6" fill="#111" />
-      <path d="M9.5 17.5 L7 15.5 M22.5 17 L25 15 M16 21 L16 23.5" stroke="#111" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M13 17 C14.5 16.2 17.5 16.2 19 17" stroke="#5d7384" strokeWidth="1.2" strokeLinecap="round" fill="none" />
-    </svg>
-  )
+  return <img src="/brand/jawabdehi-mark.svg" alt="" width={34} height={34} />
 }
 
 function Footer({ mode }: { mode?: string }) {

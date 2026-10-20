@@ -14,9 +14,7 @@ export const metadata: Metadata = {
   description:
     "Report a broken road, footpath or bridge in Mumbai anonymously, see the contractor and warranty, and hold them to a deadline.",
   referrer: "no-referrer",
-  icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='4' width='24' height='24' rx='3' transform='rotate(45 16 16)' fill='%23ffc41f' stroke='%23111' stroke-width='2'/><text x='16' y='21.5' text-anchor='middle' font-family='Arial Black,Arial' font-weight='900' font-size='14' fill='%23111'>J</text></svg>",
-  },
+  icons: { icon: "/brand/jawabdehi-mark.svg" },
 }
 
 export const viewport: Viewport = {
