@@ -1,6 +1,7 @@
 // The relayer and curator API. It never logs IPs or keeps request data: anonymous signals are
 // checked, queued, shuffled and written to Arkiv in batches from the relayer wallet.
 import { createHash } from "node:crypto"
+import os from "node:os"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { serve } from "@hono/node-server"
 import { serveStatic } from "@hono/node-server/serve-static"
@@ -39,6 +40,18 @@ import { SEED } from "../shared/seed"
 import { canonical, dayFromISO, fieldToHex, hashToField, today } from "../shared/util"
 import { ArkivStore, LocalStore, type Store } from "./store"
 import { stripJpegMetadata } from "./jpeg"
+
+// The proof library (snarkjs/ffjavascript) starts one worker thread per CPU it sees, up to 64, each
+// with its own WebAssembly memory. In a cloud container os.cpus() reports the whole host, so it ran
+// out of memory and crashed on the first proof. Cap what it sees; it reads os.cpus() lazily.
+const VERIFY_THREADS = Math.max(1, Number(process.env.VERIFY_THREADS ?? 2))
+const allCpus = os.cpus.bind(os)
+os.cpus = () => allCpus().slice(0, VERIFY_THREADS)
+
+// One verification at a time, so concurrent requests never race to build the curve.
+let verifying: Promise<boolean> = Promise.resolve(true)
+const verify = (proof: Parameters<typeof verifyProof>[0]) =>
+  (verifying = verifying.then(() => verifyProof(proof)).catch(() => false))
 
 if (existsSync(".env")) process.loadEnvFile(".env")
 const env = (name: string) => {
@@ -284,7 +297,7 @@ app.post("/api/signal", async (c) => {
   if (proof.message !== hashToField(canonical(content)).toString()) return fail(c, 400, "proof doesn't match content")
   const groups = buildGroups(await members(), roster)
   if (!groups.roots.has(fieldToHex(proof.merkleTreeRoot))) return fail(c, 400, "unknown group root — rejoin and retry")
-  if (!(await verifyProof(proof).catch(() => false))) return fail(c, 400, "invalid proof")
+  if (!(await verify(proof))) return fail(c, 400, "invalid proof")
 
   const nullifier = fieldToHex(proof.nullifier)
   if (pendingNullifiers.has(nullifier) || (await store.query({ nullifier })).length)
