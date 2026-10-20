@@ -576,10 +576,14 @@ app.post("/api/admin/asset", async (c) => {
 // In production the relayer also serves the static site built by `next build` (out/).
 if (existsSync("out")) app.use("/*", serveStatic({ root: "./out" }))
 
-await seedIfEmpty()
-// Warm the cache so the first visitor doesn't wait.
-members().catch(() => {})
-for (const w of WARDS) ward(w.id).catch(() => {})
 serve({ fetch: app.fetch, port: PORT })
+
+// Start answering first; the seed check and cache warm-up talk to Arkiv and can be slow.
+seedIfEmpty()
+  .catch((e) => console.error("Seed check failed (will serve cached data):", (e as Error).message))
+  .finally(() => {
+    members().catch(() => {})
+    for (const w of WARDS) ward(w.id).catch(() => {})
+  })
 console.log(`Relayer on http://localhost:${PORT} — store: ${store.mode}, batch every ${BATCH_SECONDS}s`)
 console.log(`Curator ${roster.curator} · Relayer ${roster.relayer}`)
