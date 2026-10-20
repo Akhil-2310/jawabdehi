@@ -175,7 +175,22 @@ app.use("/api/*", async (c, next) => {
   await next()
 })
 
-app.get("/api/health", (c) => c.json({ ok: true, mode: store.mode, queued: queue.length }))
+const STARTED = new Date().toISOString()
+app.get("/api/health", (c) =>
+  c.json({
+    ok: true,
+    mode: store.mode,
+    queued: queue.length,
+    // Railway provides the deployed commit; useful to see which build is live.
+    commit: (process.env.RAILWAY_GIT_COMMIT_SHA ?? "local").slice(0, 7),
+    started: STARTED,
+    verifyThreads: VERIFY_THREADS,
+  }),
+)
+
+// Log and keep serving: a failure in one request (or a proof worker) must not take the relayer down.
+process.on("uncaughtException", (e) => console.error("Uncaught exception:", e))
+process.on("unhandledRejection", (e) => console.error("Unhandled rejection:", e))
 
 const fail = (c: Context, status: 400 | 401 | 404 | 409, error: string) => c.json({ error }, status)
 
